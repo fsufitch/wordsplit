@@ -2,7 +2,6 @@ package wordsplit
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
 	"unicode"
@@ -75,8 +74,6 @@ func (db WordsDB) splitAsync(input []rune, start int, minWordLength int, maxNonW
 		return
 	}
 
-	fmt.Println("-----", start, string(StringRange{start, len(input)}.Slice(input)), minWordLength, maxNonWordLength)
-
 	// If we start with a non-alnum rune, skip it
 	if !(unicode.IsLetter(input[start]) || unicode.IsDigit(input[start])) {
 		db.splitAsync(input, start+1, minWordLength, maxNonWordLength, sequenceOutputCh)
@@ -113,16 +110,12 @@ func (db WordsDB) splitAsync(input []rune, start int, minWordLength int, maxNonW
 			rangeSkipped = rangeSkipped || end-start > maxNonWordLength
 		}
 		if rangeSkipped {
-			fmt.Println("bad:", string(currRange.Slice(input)), isWord)
 			continue
 		}
-
-		fmt.Println("good:", string(currRange.Slice(input)), isWord)
 
 		// A valid word or non-word, we can split on it
 		// Try to split everything after the head
 		subsequenceCh := make(chan SplitSequence)
-		fmt.Println("subsplit", string(input[end:]))
 		go db.splitAsync(input, end, minWordLength, maxNonWordLength, subsequenceCh)
 
 		// Take each split subsequence and prepend the current chunk to it
