@@ -2,7 +2,11 @@
 
 Build:
 
-    $ go build -o wordsplit .
+    $ go build -o ./cmd/wordsplit .
+
+Or, install directly:
+
+    $ go install github.com/fsufitch/wordsplit/cmd/wordsplit
 
 Usage:
 

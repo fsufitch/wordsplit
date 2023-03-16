@@ -2,7 +2,7 @@ FROM golang:1.20 AS builder
 
 WORKDIR /wordsplit
 COPY . .
-RUN go build -o wordsplit .
+RUN go build -o wordsplit ./cmd/wordsplit
 
 FROM busybox AS runtime
 
