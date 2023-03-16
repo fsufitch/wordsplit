@@ -2,8 +2,10 @@ package wordsplit
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
+	"unicode"
 )
 
 type WordsDB struct {
@@ -56,7 +58,7 @@ type StringRange struct {
 	Start, End int
 }
 
-func (r StringRange) Slice(input string) string {
+func (r StringRange) Slice(input []rune) []rune {
 	return input[r.Start:r.End]
 }
 
@@ -66,27 +68,26 @@ func (r StringRange) Len() int {
 
 type SplitSequence []StringRange
 
-func (db WordsDB) isValidRange(input string, sRange StringRange, minWordLength int, maxNonWordLength int) bool {
-	if db.Contains(sRange.Slice(input)) {
-		if sRange.Len() >= minWordLength {
-			return true
-		}
-	} else if sRange.Len() <= maxNonWordLength {
-		return true
-	}
-	return false
-}
-
-func (db WordsDB) splitAsync(input string, start int, minWordLength int, maxNonWordLength int, sequenceOutputCh chan<- SplitSequence) {
+func (db WordsDB) splitAsync(input []rune, start int, minWordLength int, maxNonWordLength int, sequenceOutputCh chan<- SplitSequence) {
 	// Recursion base case: splitting an empty string
 	if start >= len(input) {
 		close(sequenceOutputCh)
 		return
 	}
 
-	// Recursion base case: no split happens, just process the whole input as
+	fmt.Println("-----", start, string(StringRange{start, len(input)}.Slice(input)), minWordLength, maxNonWordLength)
+
+	// If we start with a non-alnum rune, skip it
+	if !(unicode.IsLetter(input[start]) || unicode.IsDigit(input[start])) {
+		db.splitAsync(input, start+1, minWordLength, maxNonWordLength, sequenceOutputCh)
+		return
+	}
+
+	// Recursion base case: no split happens, just process the whole input as a single "word"
 	noSplitRange := StringRange{start, len(input)}
-	if db.isValidRange(input, noSplitRange, minWordLength, maxNonWordLength) {
+	noSplitIsWord := db.Contains(string(noSplitRange.Slice(input)))
+	if (noSplitIsWord && len(input)-start >= minWordLength) ||
+		(len(input)-start <= maxNonWordLength) {
 		sequenceOutputCh <- SplitSequence{noSplitRange}
 	}
 
@@ -94,27 +95,34 @@ func (db WordsDB) splitAsync(input string, start int, minWordLength int, maxNonW
 	alreadyOutputRanges := map[StringRange]struct{}{}
 
 	// Consider splitting on every range in the remaining input
-	for end := start + 1; end < len(input); end++ {
-		currRange := StringRange{start, end}
-		isWord := db.Contains(currRange.Slice(input))
-
-		if isWord {
-			if currRange.Len() < minWordLength {
-				// currRange has a word, but it's too short; skip it
-				continue
-			}
-
-		} else {
-			if currRange.Len() > maxNonWordLength {
-				// currRange has a nonword, but it's too long; skip it
-				continue
-			}
+	for end := start + 1; end <= len(input); end++ {
+		if !(unicode.IsLetter(input[end-1]) || unicode.IsDigit(input[end-1])) {
+			// If the last character is not alphanumeric, stop building
+			break
 		}
+
+		currRange := StringRange{start, end}
+		nextIsAlnum := end+1 < len(input) && unicode.In(input[end+1], unicode.Letter, unicode.Digit)
+		isWord := db.Contains(string(currRange.Slice(input)))
+
+		rangeSkipped := false
+		rangeSkipped = rangeSkipped || !nextIsAlnum
+		if isWord {
+			rangeSkipped = rangeSkipped || end-start < minWordLength
+		} else {
+			rangeSkipped = rangeSkipped || end-start > maxNonWordLength
+		}
+		if rangeSkipped {
+			fmt.Println("bad:", string(currRange.Slice(input)), isWord)
+			continue
+		}
+
+		fmt.Println("good:", string(currRange.Slice(input)), isWord)
 
 		// A valid word or non-word, we can split on it
 		// Try to split everything after the head
-
 		subsequenceCh := make(chan SplitSequence)
+		fmt.Println("subsplit", string(input[end:]))
 		go db.splitAsync(input, end, minWordLength, maxNonWordLength, subsequenceCh)
 
 		// Take each split subsequence and prepend the current chunk to it
@@ -123,7 +131,7 @@ func (db WordsDB) splitAsync(input string, start int, minWordLength int, maxNonW
 			var nextRangeIsNonWord bool
 			if len(subsequence) > 0 {
 				nextRange = &subsequence[0]
-				nextRangeIsNonWord = !db.Contains(nextRange.Slice(input))
+				nextRangeIsNonWord = !db.Contains(string(nextRange.Slice(input)))
 			}
 
 			// Combine the current range with the split sequence of ranges from the recursive call
@@ -161,7 +169,7 @@ func (db WordsDB) splitAsync(input string, start int, minWordLength int, maxNonW
 
 func (db WordsDB) Split(input string, minWordLength int, maxNonWordLength int) (outputSplits []SplitSequence) {
 	sequencesCh := make(chan SplitSequence)
-	go db.splitAsync(input, 0, minWordLength, maxNonWordLength, sequencesCh)
+	go db.splitAsync([]rune(input), 0, minWordLength, maxNonWordLength, sequencesCh)
 
 	for seq := range sequencesCh {
 		// Sequence is OK, add it to outputs
