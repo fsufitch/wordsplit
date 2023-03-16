@@ -48,7 +48,11 @@ func main() {
 	}()
 
 	for input := range inputWordsCh {
-		for _, sequence := range db.Split(input, *minWordLengthFlag, *maxNonWordLengthFlag) {
+		sequences := db.Split(input, *minWordLengthFlag, *maxNonWordLengthFlag)
+		if len(sequences) == 0 {
+			fmt.Printf("%s ???\n", input)
+		}
+		for _, sequence := range sequences {
 			outArray := []string{}
 			for _, chunk := range sequence {
 				word := input[chunk.Start:chunk.End]
