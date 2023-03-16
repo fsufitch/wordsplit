@@ -1,17 +1,20 @@
 # wordsplit
 
-    Usage of /dist/wordsplit:
+Build:
+
+    $ go build -o wordsplit .
+
+Usage:
+
+    $ ./wordsplit -h
+    Usage of ./wordsplit:
       -f string
-            words file to use; default from WORDS_FILE (default "/dist/words_alpha.txt")
+            words file to use; default from WORDS_FILE (default "")
       -nw int
             maximum valid nonword length (default 3)
       -s    use stdin to get words to split; otherwise, split positional args
       -w int
             minimum valid word length (default 3)
-
-Build:
-
-    $ go build -o wordsplit .
 
 Use with `-f` to pass in a words file ([get words_alpha.txt from here](https://github.com/dwyl/english-words)).    
 
